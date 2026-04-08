@@ -3,9 +3,6 @@ import {
   GROUND_Y,
   CANVAS_WIDTH,
   MAX_HEALTH,
-  ATTACK_DAMAGE,
-  MOVEMENT_SPEED,
-  JUMP_VELOCITY,
 } from './constants';
 import { useGameStore } from '../store/gameStore';
 
@@ -72,52 +69,149 @@ export class Player {
   }
 
   draw(ctx: CanvasRenderingContext2D) {
-    // 绘制受击闪烁
+    const isP1 = this.id === 1;
+    const dir = this.facingRight ? 1 : -1;
+    const cx = this.x + this.width / 2;
+    const cy = this.y + this.height / 2;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(dir, 1);
+
+    const isMoving = this.velocityX !== 0;
+    const bounce = (isMoving && !this.isJumping) ? Math.sin(Date.now() / 60) * 3 : 0;
+
+    const primaryColor = isP1 ? '#b91c1c' : '#1d4ed8'; // Red or Blue
+    const secondaryColor = isP1 ? '#7f1d1d' : '#1e3a8a';
+    const skinColor = '#fcd34d';
+    const darkColor = '#0f172a';
+
     if (this.hitTimer > 0) {
-      this.hitTimer--;
-      ctx.fillStyle = this.hitTimer % 4 < 2 ? 'white' : this.color;
-    } else {
-      ctx.fillStyle = this.color;
+      ctx.filter = 'brightness(250%) contrast(150%)';
     }
 
-    // 绘制角色主体
-    ctx.fillRect(this.x, this.y, this.width, this.height);
+    // Back Arm
+    ctx.fillStyle = secondaryColor;
+    ctx.fillRect(-10, -10 + bounce, 12, 25);
 
-    // 绘制防御护盾特效
-    if (this.isDefending) {
-      ctx.strokeStyle = 'rgba(100, 200, 255, 0.8)';
-      ctx.lineWidth = 4;
+    // Back Leg
+    const legAngle = isMoving ? Math.sin(Date.now() / 80) * 15 : (this.isJumping ? -10 : 0);
+    ctx.fillStyle = secondaryColor;
+    ctx.fillRect(-15 + legAngle, 20, 14, 30);
+
+    // Body (Robe)
+    ctx.fillStyle = primaryColor;
+    ctx.fillRect(-20, -15 + bounce, 40, 45);
+    // Belt
+    ctx.fillStyle = '#fef08a';
+    ctx.fillRect(-22, 15 + bounce, 44, 6);
+
+    // Head
+    ctx.fillStyle = skinColor;
+    ctx.fillRect(-12, -40 + bounce, 25, 25);
+    // Eyes
+    ctx.fillStyle = darkColor;
+    ctx.fillRect(2, -32 + bounce, 4, 4);
+
+    // Hair / Hat
+    ctx.fillStyle = darkColor;
+    if (isP1) {
+      // Bamboo hat (Douli)
       ctx.beginPath();
-      ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.height / 2 + 10, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.moveTo(-30, -35 + bounce);
+      ctx.lineTo(20, -35 + bounce);
+      ctx.lineTo(-5, -55 + bounce);
+      ctx.fill();
+    } else {
+      // Headband & spiky hair
+      ctx.fillRect(-15, -45 + bounce, 30, 15);
+      ctx.fillStyle = primaryColor; // headband
+      ctx.fillRect(-15, -38 + bounce, 30, 4);
+      ctx.fillRect(-25, -38 + bounce, 10, 4); // tail
     }
 
-    // 绘制攻击判定框 (Debug/Visuals)
-    if (this.isAttacking) {
-      ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
-      ctx.fillRect(
-        this.x + this.attackBox.offsetX,
-        this.y + this.attackBox.offsetY,
-        this.attackBox.width,
-        this.attackBox.height
-      );
+    // Front Leg
+    ctx.fillStyle = primaryColor;
+    ctx.fillRect(5 - legAngle, 20, 14, 30);
+
+    // Front Arm
+    ctx.fillStyle = primaryColor;
+    if (this.isDefending) {
+      // Guard pose
+      ctx.fillRect(5, -15 + bounce, 15, 20);
+      ctx.fillRect(20, -15 + bounce, 20, 12);
+    } else if (this.isAttacking) {
+      // Attack pose
+      ctx.fillRect(5, -10 + bounce, 35, 12);
+    } else {
+      // Idle/Run pose
+      const armAngle = isMoving ? Math.sin(Date.now() / 80 + Math.PI) * 15 : (this.isJumping ? 20 : 0);
+      ctx.fillRect(0 + armAngle, -10 + bounce, 14, 25);
+    }
+
+    // Weapon / Effects
+    if (isP1) {
+      // Sword
+      ctx.fillStyle = '#cbd5e1';
+      if (this.isAttacking) {
+         ctx.fillRect(35, -12 + bounce, 70, 8); // Stab
+         ctx.fillStyle = '#475569';
+         ctx.fillRect(35, -16 + bounce, 8, 16); // Hilt
+         // Slash arc
+         ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+         ctx.beginPath();
+         ctx.arc(45, -8 + bounce, 60, -Math.PI/3, Math.PI/3);
+         ctx.arc(45, -8 + bounce, 45, Math.PI/3, -Math.PI/3, true);
+         ctx.fill();
+      } else if (this.isDefending) {
+         ctx.fillRect(25, -45 + bounce, 10, 60); // Block
+      } else {
+         ctx.fillRect(-30, -5 + bounce, 8, 55); // Sheathed
+      }
+    } else {
+      // Glowing Fists
+      ctx.fillStyle = '#e0f2fe';
+      if (this.isAttacking) {
+         ctx.fillRect(40, -14 + bounce, 18, 18);
+         // Impact wave
+         ctx.fillStyle = 'rgba(56, 189, 248, 0.7)';
+         ctx.beginPath();
+         ctx.arc(65, -5 + bounce, 40, -Math.PI/2.5, Math.PI/2.5);
+         ctx.arc(65, -5 + bounce, 20, Math.PI/2.5, -Math.PI/2.5, true);
+         ctx.fill();
+      } else {
+         const armAngle = isMoving ? Math.sin(Date.now() / 80 + Math.PI) * 15 : (this.isJumping ? 20 : 0);
+         ctx.fillRect(2 + armAngle, 10 + bounce, 14, 14);
+      }
+    }
+
+    ctx.restore();
+
+    // Defense Shield
+    if (this.isDefending) {
+      ctx.strokeStyle = isP1 ? 'rgba(239, 68, 68, 0.8)' : 'rgba(59, 130, 246, 0.8)';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, this.height / 2 + 20, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = isP1 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)';
+      ctx.fill();
     }
   }
 
   update(ctx: CanvasRenderingContext2D) {
+    if (this.hitTimer > 0) this.hitTimer--;
+
     this.draw(ctx);
 
     if (this.isDead) return;
 
-    // 更新位置
     this.x += this.velocityX;
     this.y += this.velocityY;
 
-    // 边界限制
     if (this.x < 0) this.x = 0;
     if (this.x + this.width > CANVAS_WIDTH) this.x = CANVAS_WIDTH - this.width;
 
-    // 重力系统
     if (this.y + this.height + this.velocityY >= GROUND_Y) {
       this.velocityY = 0;
       this.y = GROUND_Y - this.height;
@@ -126,10 +220,8 @@ export class Player {
       this.velocityY += GRAVITY;
     }
 
-    // 更新攻击判定框朝向
     this.attackBox.offsetX = this.facingRight ? this.width : -this.attackBox.width;
 
-    // 攻击计时器
     if (this.isAttacking && this.attackTimer > 0) {
       this.attackTimer--;
     } else {
@@ -152,19 +244,17 @@ export class Player {
 
   takeDamage(amount: number) {
     if (this.isDefending) {
-      // 防御时只受到 20% 伤害，并有闪烁提示
       this.health -= amount * 0.2;
     } else {
       this.health -= amount;
       this.hitTimer = 15;
     }
-    
+
     if (this.health <= 0) {
       this.health = 0;
       this.isDead = true;
     }
 
-    // 同步到 UI Store
     useGameStore.getState().setPlayerHealth(this.id, this.health);
   }
 }
